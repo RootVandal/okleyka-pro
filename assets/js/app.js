@@ -73,6 +73,15 @@
       if (video.paused) { userPaused = false; video.play().catch(() => {}); } else { userPaused = true; video.pause(); }
     });
     video.addEventListener('play', setIcon); video.addEventListener('pause', setIcon);
+    // звук включается только по кнопке: фильм начинается сначала
+    const soundBtn = $('#heroSound');
+    soundBtn.addEventListener('click', () => {
+      const on = video.muted;
+      video.muted = !on;
+      soundBtn.setAttribute('aria-pressed', String(on));
+      soundBtn.textContent = on ? 'Выключить звук' : 'Смотреть со звуком';
+      if (on) { video.currentTime = 0; userPaused = false; video.play().catch(() => {}); }
+    });
     new IntersectionObserver(([en]) => {
       if (en.isIntersecting && !userPaused) video.play().catch(() => {});
       else video.pause();
@@ -82,7 +91,7 @@
 
   /* ---------- веер плёнок ---------- */
   const fan = $('#fan'), caseEl = $('#case'), worksSec = $('#works');
-  const N = WORKS.length, STEP = 10.6;
+  const N = WORKS.length, STEP = N <= 5 ? 15 : 10.6; // мало образцов — раскрываем веер шире
   let cur = Math.max(0, WORKS.findIndex((w) => w.id === WORKS_DEFAULT));
   let calcRef = null;
 
@@ -134,6 +143,7 @@
     $('h3', caseEl).textContent = w.car;
     $('.case__text', caseEl).textContent = w.text;
     $('.tags', caseEl).innerHTML = w.tags.map((t) => `<li>${esc(t)}</li>`).join('');
+    $('.case__thumbs', caseEl).style.setProperty('--n', w.n);
     $('.case__thumbs', caseEl).innerHTML = Array.from({ length: w.n }, (_, k) =>
       `<button type="button" aria-pressed="${k === 0}" aria-label="${esc(w.car)}, фото ${k + 1} из ${w.n}" data-k="${k + 1}"><img src="${IMG(w.id + '-' + (k + 1))}" alt="" loading="lazy" width="200" height="150"></button>`).join('');
   }
@@ -363,22 +373,29 @@
     steps.scrollBy({ left: card * +b.dataset.track, behavior: reduce ? 'auto' : 'smooth' });
   }));
 
-  /* ---------- видео Rutube: грузим плеер только по клику ---------- */
+  /* ---------- ролики центра: файл грузится только по клику ---------- */
   const vids = $('#videos');
   vids.innerHTML = VIDEOS.map((v) => `
-    <button class="vid" type="button" data-id="${v.id}" aria-label="Смотреть видео: ${esc(v.t)}">
-      <img src="${IMG(v.img)}" alt="" loading="lazy" width="960" height="540">
-      <span class="vid__play"><svg><use href="#i-play"/></svg></span>
-      <span class="vid__cap"><small>Rutube<i>${esc(v.d)}</i></small>${esc(v.t)}</span>
-    </button>`).join('');
+    <figure class="vid">
+      <button class="vid__btn" type="button" data-src="${v.src}" aria-label="Смотреть видео: ${esc(v.t)}">
+        <img src="${IMG(v.src)}" alt="" loading="lazy" width="480" height="854">
+        <span class="vid__play"><svg><use href="#i-play"/></svg></span>
+        <span class="vid__cap"><small>${esc(v.d)}</small>${esc(v.t)}</span>
+      </button>
+    </figure>`).join('');
   vids.addEventListener('click', (e) => {
-    const b = e.target.closest('.vid');
-    if (!b || $('iframe', b)) return;
-    const f = document.createElement('iframe');
-    f.src = `https://rutube.ru/play/embed/${b.dataset.id}`;
-    f.allow = 'autoplay; fullscreen; encrypted-media; clipboard-write';
-    f.allowFullscreen = true; f.title = b.getAttribute('aria-label');
-    b.append(f);
+    const b = e.target.closest('.vid__btn');
+    if (!b) return;
+    const v = document.createElement('video');
+    v.src = `assets/video/${b.dataset.src}.mp4`;
+    v.poster = IMG(b.dataset.src);
+    v.controls = true; v.playsInline = true; v.preload = 'auto';
+    v.setAttribute('aria-label', b.getAttribute('aria-label').replace('Смотреть видео: ', ''));
+    // играет только один ролик: остальные и фильм в шапке ставим на паузу
+    v.addEventListener('play', () => $$('video').forEach((o) => { if (o !== v) o.pause(); }));
+    b.replaceWith(v);
+    v.play().catch(() => {});
+    v.focus({ preventScroll: true });
   });
 
   /* ---------- вопросы ---------- */
