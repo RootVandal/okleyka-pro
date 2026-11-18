@@ -277,6 +277,24 @@
     updateCalc();
   });
 
+  // сумма меняется плавно, а не скачком
+  let totalShown = 0, totalRaf = 0;
+  function setTotal(has, total) {
+    const el = $('#sheetTotal');
+    cancelAnimationFrame(totalRaf);
+    const draw = (v) => { el.textContent = (v ? 'от' + NBSP : '') + fmt(v); };
+    if (has && !total) { el.textContent = 'по запросу'; totalShown = 0; return; }
+    const from = totalShown, t0 = performance.now(), dur = 480;
+    if (reduce || from === total) { totalShown = total; draw(total); return; }
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      totalShown = k === 1 ? total : Math.round((from + (total - from) * e) / 500) * 500;
+      draw(totalShown);
+      if (k < 1) totalRaf = requestAnimationFrame(step);
+    };
+    totalRaf = requestAnimationFrame(step);
+  }
+
   function updateCalc() {
     const forced = forcedIds();
     forced.forEach((id) => sel.add(id));
@@ -297,7 +315,7 @@
     $('#sheetLines').innerHTML = lines.map((l) =>
       `<li><span>${esc(l.name)}<small>${esc(l.title)}${l.forced ? ', обязательна перед керамикой' : ''}</small></span><span>${l.price}</span></li>`).join('');
     $('#sheetEmpty').hidden = lines.length > 0;
-    $('#sheetTotal').textContent = lines.length ? (total ? 'от' + NBSP + fmt(total) : 'по запросу') : '0' + NBSP + '₽';
+    setTotal(lines.length > 0, total);
     $('#sheetNote').textContent = (ask && total ? 'Плюс позиции «по запросу» — посчитаем отдельно. ' : '') + 'Цены — ориентир, не публичная оферта.';
     $('#sheetClass').textContent = CAR_CLASSES[cls];
     $('#sheetRefRow').hidden = !calcRef;
